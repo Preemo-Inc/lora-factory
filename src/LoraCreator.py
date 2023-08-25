@@ -70,6 +70,9 @@ class LORAFactory:
             print(f"lora_model_path is the same as finetuned_model_path! Won't save to prevent overriding finetuned model")
             return
         self.finetuned_model.save_pretrained(lora_model_path)
+        # copy the tokenizer 
+        tokenizer = AutoTokenizer.from_pretrained(finetuned_model_path)
+        tokenizer.save_pretrained(lora_model_path)
 
     # Compute a rank-r approximation of given matrix
     def approximation(self, matrix, r):
