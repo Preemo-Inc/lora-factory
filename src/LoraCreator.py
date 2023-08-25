@@ -2,7 +2,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import torch
 
 class LORAFactory:
-    def __init__(self, foundation_model_path, finetuned_model_path, rank=2):
+    def __init__(self, foundation_model_path, finetuned_model_path, rank=4):
         self.foundation_model_path = foundation_model_path
         self.finetuned_model_path = finetuned_model_path
         self.rank = rank
@@ -13,15 +13,22 @@ class LORAFactory:
             "v_proj",
             "o_proj"
         ]
-        self.load_models()
 
-    def load_models(self):
+    def load_foundation_model(self):
         print(f"loading foundational model ...")
         self.foundation_model = AutoModelForSequenceClassification.from_pretrained(self.foundation_model_path)
+
+    def load_finetuned_model(self):
         print(f"loading fine-tuned model ...") 
-        self.finetuned_model = AutoModelForSequenceClassification.from_pretrained(self.finetuned_model_path)
+        self.finetuned_model = AutoModelForSequenceClassification.from_pretrained(self.finetuned_model_path) 
+
+    def load_models(self):
+        self.load_foundation_model()
+        self.load_finetuned_model()
 
     def get_tensor_component(self, tensor_name):
+        # tensor_name example: "model.layers.0.self_attn.k_proj.weight"
+        # they are recorded in the pytorch_model.bin.index.json file
         model = model._modules['model']
         tensor_name = tensor_name.split(".")
         assert len(tensor_name)==6 and tensor_name[1]=='layers' and tensor_name[5]=='weight'
@@ -44,6 +51,25 @@ class LORAFactory:
         low_rank_tensor = self.approximation(diff_tensor, self.rank)
         # override the finetuned model with the new tensor
         self.write_tensor(self.finetuned_model, tensor_name, low_rank_tensor)
+
+    def create_lora(self):
+        num_layers = len(self.foundation_model._modules["model"].layers)
+        for layer_idx in range(num_layers):
+            foundation_layer = self.foundation_model._modules["model"].layers[layer_idx]._modules["self_attn"]
+            finetuned_layer = self.finetuned_model._modules["model"].layers[layer_idx]._modules["self_attn"]
+            for comp in self.components:
+                foundation_tensor = getattr(foundation_layer, comp).weight
+                finetuned_tensor = getattr(finetuned_layer, comp).weight
+                diff_tensor = finetuned_tensor - foundation_tensor
+                low_rank_tensor = self.approximation(diff_tensor, self.rank)
+                # override the finetuned model with the new tensor
+                getattr(finetuned_layer, comp).weight = torch.nn.Parameter(low_rank_tensor)
+        
+    def save_lora(self, lora_model_path):
+        if lora_model_path == self.finetuned_model_path:
+            print(f"lora_model_path is the same as finetuned_model_path! Won't save to prevent overriding finetuned model")
+            return
+        self.finetuned_model.save_pretrained(lora_model_path)
 
     # Compute a rank-r approximation of given matrix
     def approximation(self, matrix, r):
