@@ -1,4 +1,4 @@
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoModelForCausalLM, AutoTokenizer
 from fastchat.train.train_lora import get_peft_state_maybe_zero_3
 from peft import LoraConfig, LoraModel, PeftModel, mapping
 import torch
@@ -9,7 +9,7 @@ import os
 class LORAFactory:
     def __init__(self, foundation_model_path, finetuned_model_path, adapter_model_path, rank=4):
         if adapter_model_path==foundation_model_path or adapter_model_path==finetuned_model_path:
-            print(f"Please choose an adapter model path that is different from both the foundation model path and the finetuned model path.")
+            print(f"ERROR: Please choose an adapter model path that is different from both the foundation model path and the finetuned model path.")
             return
         self.foundation_model_path = foundation_model_path
         self.finetuned_model_path = finetuned_model_path
@@ -22,14 +22,16 @@ class LORAFactory:
         print(f"load foundational model ...")
         # self.foundation_model = AutoModelForSequenceClassification.from_pretrained(self.foundation_model_path)
         self.foundation_model = AutoModelForCausalLM.from_pretrained(
-            self.foundation_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True
+            self.foundation_model_path 
+            # self.foundation_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True
         )
 
     def load_finetuned_model(self):
         print(f"load fine-tuned model ...") 
         # self.finetuned_model = AutoModelForSequenceClassification.from_pretrained(self.finetuned_model_path) 
         self.finetuned_model = AutoModelForCausalLM.from_pretrained(
-            self.finetuned_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True
+            self.finetuned_model_path
+            # self.finetuned_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True
         )
 
     def initialize_adapter(self):
@@ -144,9 +146,13 @@ class LORAFactory:
             self.finetuned_model_path,
             self.adapter_model_path
         ]
+        print(f"load foundational model ...")
+        foundation_model = AutoModelForCausalLM.from_pretrained(
+            self.foundation_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True
+        )
         merged_model = PeftModel.from_pretrained(
-            lora_factory.foundation_model,
-            lora_factory.adapter_model_path,
+            foundation_model,
+            self.adapter_model_path,
         )
         merged_model = merged_model.merge_and_unload()
         base_tokenizer = AutoTokenizer.from_pretrained(self.foundation_model_path, use_fast=False, legacy=False)
