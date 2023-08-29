@@ -23,7 +23,6 @@ class LORAFactory:
         # self.foundation_model = AutoModelForSequenceClassification.from_pretrained(self.foundation_model_path)
         self.foundation_model = AutoModelForCausalLM.from_pretrained(
             self.foundation_model_path 
-            # self.foundation_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True
         )
 
     def load_finetuned_model(self):
@@ -31,7 +30,6 @@ class LORAFactory:
         # self.finetuned_model = AutoModelForSequenceClassification.from_pretrained(self.finetuned_model_path) 
         self.finetuned_model = AutoModelForCausalLM.from_pretrained(
             self.finetuned_model_path
-            # self.finetuned_model_path, torch_dtype=torch.float16, low_cpu_mem_usage=True
         )
 
     def initialize_adapter(self):
